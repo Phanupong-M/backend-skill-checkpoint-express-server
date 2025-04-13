@@ -1,4 +1,4 @@
-export const validateCreateQuestionData = (req,res,next) => {
+export const validateCreateData = (req,res,next) => {
     const {title, description, category} = req.body 
     
     if(!title || !description || !category){

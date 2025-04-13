@@ -1,6 +1,6 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
-import { validateCreateQuestionData } from "../middlewares/questionValidate.mjs";
+
 
 const answerRouter = Router();
 

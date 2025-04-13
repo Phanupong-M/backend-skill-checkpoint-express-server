@@ -1,6 +1,9 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
-import { validateCreateQuestionData } from "../middlewares/questionValidate.mjs";
+import { validateCreateData } from "../middlewares/questionValidate.mjs";
+import { validateAnswerContent } from "../middlewares/answerValidate.mjs";
+import { checkQuestionExists } from "../middlewares/questionExists.mjs";
+import { validateVote } from "../middlewares/voteValidate.mjs";
 
 const questionRouter = Router();
 
@@ -20,7 +23,7 @@ questionRouter.get("/", async (req, res) => {
 });
 
 // post method question
-questionRouter.post("/", [validateCreateQuestionData], async (req, res) => {
+questionRouter.post("/", [validateCreateData], async (req, res) => {
   const { title, description, category } = req.body;
   try {
     const result = await connectionPool.query(
@@ -44,13 +47,10 @@ questionRouter.post("/", [validateCreateQuestionData], async (req, res) => {
 questionRouter.get("/search", async (req, res) => {
   const { title, category } = req.query;
 
-  if (
-    (title && typeof title !== "string") ||
-    (category && typeof category !== "string")
-  ) {
+  if (!title && !category) {
     return res.status(400).json({
       message: "Invalid search parameters.",
-    });
+    })
   }
 
   try {
@@ -71,8 +71,6 @@ questionRouter.get("/search", async (req, res) => {
     if (whereClauses.length > 0) {
       query += " WHERE " + whereClauses.join(" AND ");
     }
-
-    console.log(query, values);
 
     const result = await connectionPool.query(query, values);
 
@@ -112,10 +110,7 @@ questionRouter.get("/:questionId", async (req, res) => {
 });
 
 // put method question by id
-questionRouter.put(
-  "/:questionId",
-  [validateCreateQuestionData],
-  async (req, res) => {
+questionRouter.put("/:questionId",[validateCreateData],async (req, res) => {
     const { questionId } = req.params;
     const { title, description, category } = req.body;
 
@@ -132,7 +127,7 @@ questionRouter.put(
       );
 
       if (result.rowCount === 0) {
-        res.status(401).json({
+        res.status(404).json({
           message: "Question not found.",
         });
       } else {
@@ -158,7 +153,7 @@ questionRouter.delete("/:questionId", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      res.status(401).json({
+      res.status(404).json({
         message: "Question not found.",
       });
     } else {
@@ -204,23 +199,15 @@ questionRouter.get("/:questionId/answers", async (req, res) => {
 });
 
 // post method answers by question id
-questionRouter.post("/:questionId/answers", async (req, res) => {
+questionRouter.post("/:questionId/answers", [checkQuestionExists, validateAnswerContent], async (req, res) => {
   const { questionId } = req.params;
   const { content } = req.body;
+
   try {
-    const questionCheckQuery = "select id from questions where id = $1"
-    const questionCheckResult = await connectionPool.query(questionCheckQuery, [questionId]);
-
-    if (questionCheckResult.rowCount === 0) {
-      return res.status(404).json({
-        message: "Question not found.",
-      })
-    }
-
     const insertQuery = `
       INSERT INTO answers (question_id, content)
       VALUES ($1, $2)
-    `
+    `;
     const values = [questionId, content];
 
     const result = await connectionPool.query(insertQuery, values);
@@ -234,8 +221,7 @@ questionRouter.post("/:questionId/answers", async (req, res) => {
       error: error.message
     });
   }
-})
-
+});
 
 // delete method answers by question id
 questionRouter.delete("/:questionId/answers", async (req, res) => {
@@ -270,48 +256,28 @@ questionRouter.delete("/:questionId/answers", async (req, res) => {
   });
 
 // post method question_vote by question id
-questionRouter.post("/:questionId/vote", async (req, res) => {
-    const { questionId } = req.params;
-    const { vote } = req.body;
-    try {
-
-     if (vote !== 1 && vote !== -1){
-        return res.status(400).json({
-            message: "Invalid vote value.",
-          })
-     }
-
-      const questionCheckQuery = "select id from questions where id = $1"
-      const questionCheckResult = await connectionPool.query(questionCheckQuery, [questionId]);
+questionRouter.post("/:questionId/vote", [checkQuestionExists, validateVote], async (req, res) => {
+  const { questionId } = req.params;
+  const { vote } = req.body;
   
-      if (questionCheckResult.rowCount === 0) {
-        return res.status(404).json({
-          message: "Question not found.",
-        })
-      }
-  
-      const insertQuery = `
-        INSERT INTO question_votes (question_id, vote)
-        VALUES ($1, $2)
-      `
-      const values = [questionId, vote];
-  
-      const result = await connectionPool.query(insertQuery, values);
-  
-      res.status(200).json({
-        message: "Vote on the question has been recorded successfully.",
-      });
-    } catch(error) {
-      res.status(500).json({
-        message: "Unable to vote question.",
-        error: error.message
-      });
-    }
-  })
+  try {
+    const insertQuery = `
+      INSERT INTO question_votes (question_id, vote)
+      VALUES ($1, $2)
+    `;
+    const values = [questionId, vote];
 
+    const result = await connectionPool.query(insertQuery, values);
 
-
-
-
+    res.status(200).json({
+      message: "Vote on the question has been recorded successfully.",
+    });
+  } catch(error) {
+    res.status(500).json({
+      message: "Unable to vote question.",
+      error: error.message
+    });
+  }
+});
 
 export default questionRouter;
