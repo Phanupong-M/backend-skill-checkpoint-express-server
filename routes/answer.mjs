@@ -1,10 +1,43 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
 
-
 const answerRouter = Router();
-
-// post method answers_vote by answer id
+/**
+ * @swagger
+ * /answers/{answerId}/vote:
+ *   post:
+ *     summary: Vote on an answer
+ *     description: Cast a vote (upvote or downvote) on a specific answer
+ *     parameters:
+ *       - in: path
+ *         name: answerId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the answer to vote on
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - vote
+ *             properties:
+ *               vote:
+ *                 type: integer
+ *                 enum: [1, -1]
+ *                 description: 1 for upvote, -1 for downvote
+ *     responses:
+ *       200:
+ *         description: Vote recorded successfully
+ *       400:
+ *         description: Invalid vote value
+ *       404:
+ *         description: Answer not found
+ *       500:
+ *         description: Server error
+ */
 answerRouter.post("/:answerId/vote", async (req, res) => {
     const { answerId } = req.params
     const { vote } = req.body
@@ -44,4 +77,4 @@ answerRouter.post("/:answerId/vote", async (req, res) => {
     }
   })
   
-  export default answerRouter
+export default answerRouter
